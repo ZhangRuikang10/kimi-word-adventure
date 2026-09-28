@@ -1,0 +1,7 @@
+import { describe, expect, it } from "vitest";
+import { confusionPairs } from "../src/analytics/confusionPairs";
+import { visualTransferScore } from "../src/analytics/visualTransfer";
+import { conceptDimensions, confusionDetails, questionTypeMetrics } from "../src/analytics/teacherDashboard";
+import type { AttemptEvent } from "../src/types/learning";
+const event=(id:string,correct:boolean,visualVariantId?:string):AttemptEvent=>({id,sessionId:"s",conceptId:"colour-red",questionType:"WORD_TO_PICTURE",visualVariantId,correct,selectedAnswer:correct?"colour-red":"colour-blue",expectedAnswer:"colour-red",responseMs:500,createdAt:"2026-09-27T00:00:00Z"});
+describe("teacher analytics",()=>{it("flags possible image dependence and aggregates confusion pairs",()=>{const attempts=[event("1",true,"core"),event("2",true,"core"),event("3",true,"core"),event("4",true,"core"),event("5",false,"variant-a"),event("6",false,"variant-b")];const transfer=visualTransferScore(attempts,new Set(["core"]));expect(transfer.possibleImageDependence).toBe(true);expect(transfer.uniqueVariantsSeen).toBe(2);expect(confusionPairs(attempts)[0]).toEqual({pair:"colour-blue ↔ colour-red",count:2});expect(questionTypeMetrics(attempts).WORD_TO_PICTURE).toMatchObject({attempts:6,correct:4});expect(conceptDimensions(attempts).wordReading.attempts).toBe(6);expect(confusionDetails(attempts)[0]).toMatchObject({targetConceptId:"colour-red",selectedAnswer:"colour-blue",count:2});});});

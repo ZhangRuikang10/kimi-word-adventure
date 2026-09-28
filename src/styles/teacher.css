@@ -1,0 +1,12 @@
+.teacher-page table { width:100%; border-collapse:collapse; text-align:left; }
+.teacher-page th,.teacher-page td { padding:9px 6px; border-bottom:1px solid #dce6ec; }
+.teacher-page tbody tr { cursor:pointer; }
+.teacher-page tbody tr:hover { background:#eff8fb; }
+.teacher-page label { display:block; margin:12px 0; }
+.teacher-page input[type="checkbox"] { margin-right:8px; }
+.teacher-page section button,.import-control { margin:5px; padding:9px 12px; border:1px solid #b6d6df; border-radius:8px; color:#1e6176; background:#fff; font-weight:800; }
+.import-control { display:inline-block !important; }
+.import-control input { display:block; max-width:250px; margin-top:7px; }
+.day-table { display:grid; grid-template-columns:repeat(7,minmax(64px,1fr)); gap:6px; overflow-x:auto; }
+.day-table div { display:grid; gap:4px; min-width:64px; padding:8px; border-radius:8px; background:#eff7fa; text-align:center; }
+.teacher-word-list { display:flex; flex-wrap:wrap; gap:5px; max-height:190px; overflow:auto; margin-top:12px; }

@@ -1,0 +1,2 @@
+import type { AttemptEvent } from "../types/learning";
+export function confusionPairs(attempts: AttemptEvent[]) { const counts=new Map<string,number>(); for(const attempt of attempts){if(attempt.correct || !attempt.selectedAnswer) continue; const pair=[attempt.conceptId,attempt.selectedAnswer].sort().join(" ↔ "); counts.set(pair,(counts.get(pair)??0)+1);} return [...counts].map(([pair,count])=>({pair,count})).sort((a,b)=>b.count-a.count); }

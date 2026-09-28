@@ -1,0 +1,24 @@
+.secondary-button { width:min(100%,400px); min-height:52px; margin-top:16px; border:0; color:#22718c; background:transparent; font-weight:1000; }
+.child-nav { grid-template-columns:repeat(3,1fr); gap:8px; }
+.child-nav button { min-height:48px; padding:6px 2px; }
+.mini-calendar { margin:22px 0; padding:18px; border-radius:24px; background:#ffffffc9; box-shadow:0 8px 24px #376d7712; text-align:left; }
+.mini-calendar h2 { margin:0 0 12px; font-size:1.15rem; }
+.calendar-weekdays,.calendar-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; text-align:center; }
+.calendar-weekdays span { color:#7790a0; font-size:.7rem; font-weight:900; }
+.calendar-day { position:relative; display:grid; min-height:34px; place-items:center; border-radius:11px; color:#8ba0ac; font-size:.8rem; font-weight:900; }
+.calendar-day.complete { color:#fff; background:#58b99c; }
+.calendar-day.today { color:#176b83; outline:2px solid #5fc0d7; background:#e4f8fc; }
+.calendar-day.missed { color:#9ca7ae; background:#edf1f2; }
+.calendar-day i { position:absolute; right:3px; bottom:3px; width:5px; height:5px; border-radius:50%; background:#f39a45; }
+.calendar-key { display:flex; justify-content:space-between; margin:10px 0 0; color:#718494; font-size:.68rem; font-weight:800; }
+.mistakes-page { text-align:left; }
+.mistakes-page h1,.mistakes-page .page-intro { text-align:center; }
+.mistake-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.mistake-card { display:grid; grid-template-columns:64px 1fr; align-items:center; gap:3px 10px; padding:10px; border:2px solid #f2d8c9; border-radius:18px; color:#18314f; background:#fff; text-align:left; }
+.mistake-card .word-image { grid-row:span 2; width:64px; border-radius:12px; }
+.mistake-card small { font-size:.72rem; }
+.mistake-practice-button { display:block; margin:22px auto 0; }
+.mistake-note { margin:16px 0; color:#64758d; font-weight:800; }
+.empty-mistakes { margin-top:24px; padding:36px 18px; border-radius:24px; background:#fff; text-align:center; }
+.empty-mistakes span { font-size:2.5rem; }
+@media (max-width:360px) { .child-nav { grid-template-columns:1fr; } .mistake-grid { grid-template-columns:1fr; } }
