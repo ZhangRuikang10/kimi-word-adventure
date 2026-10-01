@@ -13,11 +13,13 @@ const locale = "en-GB";
 const googleProject = "kimi-english-tts-test";
 const stylePrompt = "Speak only the exact text. Use a warm, clear, friendly British English voice for a five- to six-year-old child. Speak slightly slower than ordinary adult conversation, with clean word boundaries. Do not add words, sounds, music, or dramatic acting.";
 const prompts = [
-  ["find-the-picture.mp3", "Find the picture."],
-  ["listen-find-the-picture.mp3", "Listen. Find the picture."],
+  ["what-colour-is-it.mp3", "What colour is it?"],
+  ["what-is-the-action.mp3", "What is the action?"],
+  ["how-do-they-feel.mp3", "How do they feel?"],
+  ["who-is-this.mp3", "Who is this?"],
+  ["which-greeting-is-it.mp3", "Which greeting is it?"],
   ["what-is-this.mp3", "What is this?"],
-  ["listen-choose-the-word.mp3", "Listen. Choose the word."],
-  ["listen-and-choose.mp3", "Listen and choose the answer."],
+  ["how-many.mp3", "How many?"],
 ];
 
 function token() {

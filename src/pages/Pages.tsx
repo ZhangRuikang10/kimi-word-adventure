@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { audioFor, phraseAudioFor, sentenceAudioFor } from "../content/audioManifest";
-import { questionPromptAudioFor } from "../content/questionPromptAudio";
+import { pictureQuestionPromptFor, spokenAudioForQuestion } from "../content/questionPromptAudio";
 import { catalogById, phrases, sentences, wordConcepts } from "../content/catalog";
 import { approvedVisualsFor } from "../content/visualManifest";
 import { streak, skillBreakdown, weakConcepts } from "../analytics/teacherMetrics";
@@ -29,8 +29,8 @@ function useHomeData() {
   return { data, refresh };
 }
 
-function Speaker({ src, secondarySrc, label = "Play audio", large = false }: { src?: string; secondarySrc?: string; label?: string; large?: boolean }) {
-  const replay = () => { play(src); if (secondarySrc) window.setTimeout(() => play(secondarySrc), 900); };
+function Speaker({ src, label = "Play audio", large = false }: { src?: string; label?: string; large?: boolean }) {
+  const replay = () => play(src);
   return <button className={`speaker ${large ? "speaker-large" : ""}`} type="button" aria-label={label} onClick={replay}>🔊</button>;
 }
 function WordImage({ conceptId, alt, assetId }: { conceptId: string; alt?: string; assetId?: string }) {
@@ -70,11 +70,10 @@ function promptFor(question: Question) { const concept = conceptFor(question.tar
 function QuestionView({ question, state, onAnswer, onContinue }: { question: Question; state?: QuestionAnswerState; onAnswer: (id: string) => void; onContinue: () => void }) {
   const bridge = promptFor(question); const isPictureChoice = ["WORD_TO_PICTURE", "AUDIO_TO_PICTURE", "PHRASE_MATCH", "SENTENCE_MATCH"].includes(question.type);
   const audio = question.type === "PHRASE_MATCH" ? phraseAudioFor(bridge?.id ?? "") : question.type === "SENTENCE_MATCH" ? sentenceAudioFor(bridge?.id ?? "") : audioFor(question.targetConceptId);
-  const promptAudio = questionPromptAudioFor(question.type);
-  const hasContentAudio = question.type !== "PICTURE_TO_WORD";
-  useEffect(() => { play(promptAudio.src); const timer = hasContentAudio ? window.setTimeout(() => play(audio?.src), 900) : undefined; return () => { if (timer) window.clearTimeout(timer); }; }, [question.id]);
-  const categoryPrompt: Record<string, string> = { colours: "What colour is it?", "classroom-actions": "What is the action?", feelings: "How do they feel?", people: "Who is this?", greetings: "Which greeting is it?", objects: "What is this?", numbers: "How many?" };
-  const prompt = question.type === "WORD_TO_PICTURE" ? "Find the picture." : question.type === "PICTURE_TO_WORD" ? categoryPrompt[question.category] ?? "What is this?" : question.type === "AUDIO_TO_PICTURE" ? "Listen. Find the picture." : question.type === "AUDIO_TO_WORD" ? "Listen. Choose the word." : bridge ? "Listen and choose." : "Choose the answer.";
+  const pictureQuestion = pictureQuestionPromptFor(question.category);
+  const spokenAudio = spokenAudioForQuestion(question.type, question.category, audio);
+  useEffect(() => { play(spokenAudio?.src); }, [question.id, spokenAudio?.src]);
+  const prompt = question.type === "WORD_TO_PICTURE" ? "Find the picture." : question.type === "PICTURE_TO_WORD" ? pictureQuestion.text : question.type === "AUDIO_TO_PICTURE" ? "Listen. Find the picture." : question.type === "AUDIO_TO_WORD" ? "Listen. Choose the word." : bridge ? "Listen and choose." : "Choose the answer.";
   const finished = Boolean(state && state.result !== "open");
   const optionClass = (option: string, base: string) => {
     if (state?.result === "correct" && option === question.targetConceptId) return `${base} answer-correct`;
@@ -82,7 +81,7 @@ function QuestionView({ question, state, onAnswer, onContinue }: { question: Que
     if (state?.result === "revealed" && state.wrongOptionIds.includes(option)) return `${base} answer-wrong`;
     return base;
   };
-  return <section className="interaction-card" aria-live="polite"><h2 className="question-prompt">{prompt}</h2>{question.type === "WORD_TO_PICTURE" && <h2 className="target-word">{display(question.targetConceptId)}</h2>}{question.type === "PICTURE_TO_WORD" && <WordImage conceptId={question.targetConceptId} assetId={question.visualAssetId} />}{<Speaker src={promptAudio.src} secondarySrc={hasContentAudio ? audio?.src : undefined} large label="Play the question again" />}{bridge && <p className="bridge-text">{bridge.text}</p>}<div className={`answer-grid ${isPictureChoice ? "image-answers" : "word-answers"}`}>{question.options.map((option, index) => isPictureChoice ? <button className={optionClass(option, "image-answer")} key={`${option}-${index}`} type="button" disabled={finished} aria-label={display(option)} onClick={() => onAnswer(option)}><WordImage conceptId={option} assetId={question.optionVisualAssetIds?.[option]} alt="" /></button> : <button className={optionClass(option, "word-answer")} key={`${option}-${index}`} type="button" disabled={finished} onClick={() => onAnswer(option)}>{display(option)}</button>)}</div>{finished && <button className="primary-button continue-button" type="button" onClick={onContinue}>CONTINUE</button>}</section>;
+  return <section className="interaction-card" aria-live="polite"><h2 className="question-prompt">{prompt}</h2>{question.type === "WORD_TO_PICTURE" && <h2 className="target-word">{display(question.targetConceptId)}</h2>}{question.type === "PICTURE_TO_WORD" && <WordImage conceptId={question.targetConceptId} assetId={question.visualAssetId} />}{<Speaker src={spokenAudio?.src} large label="Play the question again" />}{bridge && <p className="bridge-text">{bridge.text}</p>}<div className={`answer-grid ${isPictureChoice ? "image-answers" : "word-answers"}`}>{question.options.map((option, index) => isPictureChoice ? <button className={optionClass(option, "image-answer")} key={`${option}-${index}`} type="button" disabled={finished} aria-label={display(option)} onClick={() => onAnswer(option)}><WordImage conceptId={option} assetId={question.optionVisualAssetIds?.[option]} alt="" /></button> : <button className={optionClass(option, "word-answer")} key={`${option}-${index}`} type="button" disabled={finished} onClick={() => onAnswer(option)}>{display(option)}</button>)}</div>{finished && <button className="primary-button continue-button" type="button" onClick={onContinue}>CONTINUE</button>}</section>;
 }
 function LearnView({ conceptId, onNext, sessionId }: { conceptId: string; onNext: () => void; sessionId: string }) {
   const concept = conceptFor(conceptId); const audio = audioFor(conceptId);

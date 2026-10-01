@@ -1,19 +1,29 @@
 import type { QuestionType } from "../types/learning";
 
 export type PromptAudio = { text: string; src: string };
-const promptAudio: Record<"find-picture" | "listen-picture" | "picture-word" | "listen-word" | "listen-answer", PromptAudio> = {
-  "find-picture": { text: "Find the picture.", src: "/assets/audio/prompts/find-the-picture.mp3" },
-  "listen-picture": { text: "Listen. Find the picture.", src: "/assets/audio/prompts/listen-find-the-picture.mp3" },
-  "picture-word": { text: "What is this?", src: "/assets/audio/prompts/what-is-this.mp3" },
-  "listen-word": { text: "Listen. Choose the word.", src: "/assets/audio/prompts/listen-choose-the-word.mp3" },
-  "listen-answer": { text: "Listen and choose the answer.", src: "/assets/audio/prompts/listen-and-choose.mp3" },
-};
-export const questionPromptAudios = Object.values(promptAudio);
 
-export function questionPromptAudioFor(type: QuestionType): PromptAudio {
-  if (type === "WORD_TO_PICTURE") return promptAudio["find-picture"];
-  if (type === "AUDIO_TO_PICTURE") return promptAudio["listen-picture"];
-  if (type === "PICTURE_TO_WORD") return promptAudio["picture-word"];
-  if (type === "AUDIO_TO_WORD") return promptAudio["listen-word"];
-  return promptAudio["listen-answer"];
+/**
+ * These are the only prompts spoken for picture-to-word questions. Every
+ * other question type speaks its learning content directly, so the answer is
+ * never preceded by a second, unrelated instruction recording.
+ */
+const pictureQuestionPrompts: Record<string, PromptAudio> = {
+  colours: { text: "What colour is it?", src: "/assets/audio/prompts/what-colour-is-it.mp3" },
+  "classroom-actions": { text: "What is the action?", src: "/assets/audio/prompts/what-is-the-action.mp3" },
+  feelings: { text: "How do they feel?", src: "/assets/audio/prompts/how-do-they-feel.mp3" },
+  people: { text: "Who is this?", src: "/assets/audio/prompts/who-is-this.mp3" },
+  greetings: { text: "Which greeting is it?", src: "/assets/audio/prompts/which-greeting-is-it.mp3" },
+  objects: { text: "What is this?", src: "/assets/audio/prompts/what-is-this.mp3" },
+  numbers: { text: "How many?", src: "/assets/audio/prompts/how-many.mp3" },
+};
+
+export const questionPromptAudios = Object.values(pictureQuestionPrompts);
+
+export function pictureQuestionPromptFor(category: string): PromptAudio {
+  return pictureQuestionPrompts[category] ?? pictureQuestionPrompts.objects;
+}
+
+/** One question, one automatic recording: prompt for a picture question, or content otherwise. */
+export function spokenAudioForQuestion(type: QuestionType, category: string, contentAudio?: Pick<PromptAudio, "src">): Pick<PromptAudio, "src"> | undefined {
+  return type === "PICTURE_TO_WORD" ? pictureQuestionPromptFor(category) : contentAudio;
 }
