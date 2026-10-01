@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { audioAssets } from "../src/content/audioManifest.ts";
+import { questionPromptAudios } from "../src/content/questionPromptAudio.ts";
 import { phrases, sentences, wordConcepts } from "../src/content/catalog.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -86,6 +87,15 @@ for (const level of ["words", "phrases", "sentences"]) {
     assert(manifestPaths.has(full), `Orphan MP3 not registered in manifest: ${full}`);
   }
 }
+const promptPaths = new Set(questionPromptAudios.map((asset) => publicPath(asset.src)));
+const promptDir = join(audioRoot, "prompts");
+assert(existsSync(promptDir), "Missing question-prompt audio directory");
+for (const asset of questionPromptAudios) {
+  const full = publicPath(asset.src);
+  assert(existsSync(full) && isMp3(full), `Question prompt is missing or invalid: ${asset.src}`);
+  assert(/mp3,24000,1/.test(probe(full)), `Unexpected prompt MP3 format: ${asset.src}`);
+}
+for (const file of readdirSync(promptDir)) if (file.endsWith(".mp3")) assert(promptPaths.has(join(promptDir, file)), `Orphan question prompt: ${file}`);
 
 console.log(JSON.stringify({
   required: { words: wordConcepts.length, phrases: phrases.length, sentences: sentences.length },
@@ -99,5 +109,6 @@ console.log(JSON.stringify({
     pendingHumanQa: audioAssets.filter((asset) => asset.approvalStatus === "pending-human-QA").length,
   },
   requiredProductionAudioMissing: 0,
+  questionPrompts: questionPromptAudios.length,
   knownTeachingTextCollisions: [...teachingText.entries()].filter(([, values]) => values.length > 1).map(([key, values]) => ({ key, ids: values })),
 }, null, 2));

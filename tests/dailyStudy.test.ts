@@ -2,7 +2,7 @@ import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getDatabase } from "../src/storage/db";
 import { IndexedDbProgressRepository } from "../src/storage/progressRepository";
-import { answerQuestion, completeSession, getTodaySession, introduceConcept, startOrResumeToday, startPracticeSession } from "../src/study/dailyStudy";
+import { answerQuestion, completeSession, continueQuestion, getTodaySession, introduceConcept, startOrResumeToday, startPracticeSession } from "../src/study/dailyStudy";
 import type { Question, SessionRecord } from "../src/types/learning";
 
 const now = new Date("2026-09-28T12:00:00Z");
@@ -26,14 +26,16 @@ describe("daily study integration", () => {
     while (await moveLearn(repo, session)) session = await sessionById(repo, session.id);
     const first = current(session) as Question; const wrong = first.options.find((id) => id !== first.targetConceptId)!;
     expect(await answerQuestion(repo, session.id, first, wrong, 400, now)).toBe("try-again");
-    expect(await answerQuestion(repo, session.id, first, wrong, 500, now)).toBe("delayed-retry");
+    expect(await answerQuestion(repo, session.id, first, wrong, 500, now)).toBe("revealed");
     expect((await repo.getConceptProgress(first.targetConceptId))?.reviewPriority).toBe("soon");
-    session = await sessionById(repo, session.id); expect(session.pendingRetries).toHaveLength(2);
+    session = await sessionById(repo, session.id); expect(session.questionStates?.[first.id]?.result).toBe("revealed"); expect(session.pendingRetries).toHaveLength(2);
     expect(session.pendingRetries?.map((item) => item.reinforcementNumber)).toEqual([1, 2]);
+    expect(await continueQuestion(repo, session.id, now)).toBe("correct");
+    session = await sessionById(repo, session.id);
     const originalQuestionCount = (session.interactions ?? []).slice(0, session.currentInteractionIndex ?? 0).filter((item) => !("kind" in item)).length;
     for (let guard = 0; guard < 20 && !(current(session) as Question | undefined)?.isRetry; guard++) {
       if (await moveLearn(repo, session)) { session = await sessionById(repo, session.id); continue; }
-      const item = current(session) as Question; await answerQuestion(repo, session.id, item, item.targetConceptId, 300, now); session = await sessionById(repo, session.id);
+      const item = current(session) as Question; await answerQuestion(repo, session.id, item, item.targetConceptId, 300, now); await continueQuestion(repo, session.id, now); session = await sessionById(repo, session.id);
     }
     const retry = current(session) as Question; expect(retry.isRetry).toBe(true);
     const retryQuestionCount = (session.interactions ?? []).slice(0, session.currentInteractionIndex ?? 0).filter((item) => !("kind" in item)).length;
@@ -41,7 +43,7 @@ describe("daily study integration", () => {
     await answerQuestion(repo, session.id, retry, retry.targetConceptId, 300, now); session = await sessionById(repo, session.id);
     for (let guard = 0; guard < 30 && !((current(session) as Question | undefined)?.isRetry && (current(session) as Question).targetConceptId === first.targetConceptId); guard++) {
       if (await moveLearn(repo, session)) { session = await sessionById(repo, session.id); continue; }
-      const item = current(session) as Question; await answerQuestion(repo, session.id, item, item.targetConceptId, 300, now); session = await sessionById(repo, session.id);
+      const item = current(session) as Question; await answerQuestion(repo, session.id, item, item.targetConceptId, 300, now); await continueQuestion(repo, session.id, now); session = await sessionById(repo, session.id);
     }
     expect((current(session) as Question).isRetry).toBe(true);
     expect((current(session) as Question).targetConceptId).toBe(first.targetConceptId);
@@ -53,6 +55,7 @@ describe("daily study integration", () => {
       if (await moveLearn(repo, session)) { session = await sessionById(repo, session.id); continue; }
       const item = current(session) as Question;
       await answerQuestion(repo, session.id, item, item.targetConceptId, 250, now);
+      await continueQuestion(repo, session.id, now);
       session = await sessionById(repo, session.id);
     }
     expect(session.completedAt).toBeTruthy(); expect(session.correctCount).toBeGreaterThanOrEqual(17); expect(session.stars).toBe(session.correctCount);

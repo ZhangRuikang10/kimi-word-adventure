@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { audioFor, phraseAudioFor, sentenceAudioFor } from "../content/audioManifest";
+import { questionPromptAudioFor } from "../content/questionPromptAudio";
 import { catalogById, phrases, sentences, wordConcepts } from "../content/catalog";
 import { approvedVisualsFor } from "../content/visualManifest";
 import { streak, skillBreakdown, weakConcepts } from "../analytics/teacherMetrics";
@@ -9,8 +10,8 @@ import { visualTransferScore } from "../analytics/visualTransfer";
 import { visualAssets } from "../content/visualManifest";
 import { forceReviewSoon, updateTeacherControls } from "../teacher/controls";
 import { IndexedDbProgressRepository } from "../storage/progressRepository";
-import { answerQuestion, conceptFor, currentInteraction, getSession, getTodaySession, introduceConcept, startOrResumeToday, startPracticeSession } from "../study/dailyStudy";
-import type { ConceptProgress, Question, SessionRecord } from "../types/learning";
+import { answerQuestion, conceptFor, continueQuestion, currentInteraction, getSession, getTodaySession, introduceConcept, startOrResumeToday, startPracticeSession } from "../study/dailyStudy";
+import type { ConceptProgress, Question, QuestionAnswerState, SessionRecord } from "../types/learning";
 
 const repository = new IndexedDbProgressRepository();
 const localAsset = (src?: string) => src?.startsWith("/assets/") ? `${import.meta.env.BASE_URL}assets/${src.slice("/assets/".length)}` : src;
@@ -28,8 +29,9 @@ function useHomeData() {
   return { data, refresh };
 }
 
-function Speaker({ src, label = "Play audio", large = false }: { src?: string; label?: string; large?: boolean }) {
-  return <button className={`speaker ${large ? "speaker-large" : ""}`} type="button" aria-label={label} onClick={() => play(src)}>🔊</button>;
+function Speaker({ src, secondarySrc, label = "Play audio", large = false }: { src?: string; secondarySrc?: string; label?: string; large?: boolean }) {
+  const replay = () => { play(src); if (secondarySrc) window.setTimeout(() => play(secondarySrc), 900); };
+  return <button className={`speaker ${large ? "speaker-large" : ""}`} type="button" aria-label={label} onClick={replay}>🔊</button>;
 }
 function WordImage({ conceptId, alt, assetId }: { conceptId: string; alt?: string; assetId?: string }) {
   const asset = visualById(assetId) ?? coreVisual(conceptId);
@@ -65,14 +67,22 @@ export function HomePage() {
 }
 
 function promptFor(question: Question) { const concept = conceptFor(question.targetConceptId); if (question.type === "PHRASE_MATCH") return phrases.find((item) => item.conceptIds.includes(concept.id)); if (question.type === "SENTENCE_MATCH") return sentences.find((item) => item.conceptIds.includes(concept.id)); return undefined; }
-function QuestionView({ question, onAnswer }: { question: Question; onAnswer: (id: string) => void }) {
+function QuestionView({ question, state, onAnswer, onContinue }: { question: Question; state?: QuestionAnswerState; onAnswer: (id: string) => void; onContinue: () => void }) {
   const bridge = promptFor(question); const isPictureChoice = ["WORD_TO_PICTURE", "AUDIO_TO_PICTURE", "PHRASE_MATCH", "SENTENCE_MATCH"].includes(question.type);
   const audio = question.type === "PHRASE_MATCH" ? phraseAudioFor(bridge?.id ?? "") : question.type === "SENTENCE_MATCH" ? sentenceAudioFor(bridge?.id ?? "") : audioFor(question.targetConceptId);
-  const needsAudio = question.type === "AUDIO_TO_PICTURE" || question.type === "AUDIO_TO_WORD" || Boolean(bridge);
-  useEffect(() => { if (needsAudio) play(audio?.src); }, [question.id]);
+  const promptAudio = questionPromptAudioFor(question.type);
+  const hasContentAudio = question.type !== "PICTURE_TO_WORD";
+  useEffect(() => { play(promptAudio.src); const timer = hasContentAudio ? window.setTimeout(() => play(audio?.src), 900) : undefined; return () => { if (timer) window.clearTimeout(timer); }; }, [question.id]);
   const categoryPrompt: Record<string, string> = { colours: "What colour is it?", "classroom-actions": "What is the action?", feelings: "How do they feel?", people: "Who is this?", greetings: "Which greeting is it?", objects: "What is this?", numbers: "How many?" };
   const prompt = question.type === "WORD_TO_PICTURE" ? "Find the picture." : question.type === "PICTURE_TO_WORD" ? categoryPrompt[question.category] ?? "What is this?" : question.type === "AUDIO_TO_PICTURE" ? "Listen. Find the picture." : question.type === "AUDIO_TO_WORD" ? "Listen. Choose the word." : bridge ? "Listen and choose." : "Choose the answer.";
-  return <section className="interaction-card" aria-live="polite"><p className="question-prompt">{prompt}</p>{question.type === "WORD_TO_PICTURE" && <h2 className="target-word">{display(question.targetConceptId)}</h2>}{question.type === "PICTURE_TO_WORD" && <WordImage conceptId={question.targetConceptId} assetId={question.visualAssetId} />}{needsAudio && <Speaker src={audio?.src} large label="Play the question again" />}{bridge && <p className="bridge-text">{bridge.text}</p>}<div className={`answer-grid ${isPictureChoice ? "image-answers" : "word-answers"}`}>{question.options.map((option, index) => isPictureChoice ? <button className="image-answer" key={`${option}-${index}`} type="button" aria-label={display(option)} onClick={() => onAnswer(option)}><WordImage conceptId={option} assetId={question.optionVisualAssetIds?.[option]} alt="" /></button> : <button className="word-answer" key={`${option}-${index}`} type="button" onClick={() => onAnswer(option)}>{display(option)}</button>)}</div></section>;
+  const finished = Boolean(state && state.result !== "open");
+  const optionClass = (option: string, base: string) => {
+    if (state?.result === "correct" && option === question.targetConceptId) return `${base} answer-correct`;
+    if (state?.result === "revealed" && option === question.targetConceptId) return `${base} answer-correct`;
+    if (state?.result === "revealed" && state.wrongOptionIds.includes(option)) return `${base} answer-wrong`;
+    return base;
+  };
+  return <section className="interaction-card" aria-live="polite"><h2 className="question-prompt">{prompt}</h2>{question.type === "WORD_TO_PICTURE" && <h2 className="target-word">{display(question.targetConceptId)}</h2>}{question.type === "PICTURE_TO_WORD" && <WordImage conceptId={question.targetConceptId} assetId={question.visualAssetId} />}{<Speaker src={promptAudio.src} secondarySrc={hasContentAudio ? audio?.src : undefined} large label="Play the question again" />}{bridge && <p className="bridge-text">{bridge.text}</p>}<div className={`answer-grid ${isPictureChoice ? "image-answers" : "word-answers"}`}>{question.options.map((option, index) => isPictureChoice ? <button className={optionClass(option, "image-answer")} key={`${option}-${index}`} type="button" disabled={finished} aria-label={display(option)} onClick={() => onAnswer(option)}><WordImage conceptId={option} assetId={question.optionVisualAssetIds?.[option]} alt="" /></button> : <button className={optionClass(option, "word-answer")} key={`${option}-${index}`} type="button" disabled={finished} onClick={() => onAnswer(option)}>{display(option)}</button>)}</div>{finished && <button className="primary-button continue-button" type="button" onClick={onContinue}>CONTINUE</button>}</section>;
 }
 function LearnView({ conceptId, onNext, sessionId }: { conceptId: string; onNext: () => void; sessionId: string }) {
   const concept = conceptFor(conceptId); const audio = audioFor(conceptId);
@@ -85,10 +95,11 @@ export function StudyPage() {
   const reload = async () => { const current = requestedSessionId ? await getSession(repository, requestedSessionId) : await startOrResumeToday(repository); if (!current) { navigate("/", { replace: true }); return; } setSession(current); if (current.completedAt) navigate(`/finish?session=${current.id}`, { replace: true }); };
   useEffect(() => { void reload(); }, []);
   const advanceLearn = async () => { if (!session) return; const next = { ...session, currentInteractionIndex: (session.currentInteractionIndex ?? 0) + 1 }; await repository.saveSession(next); setSession(next); };
-  const answer = async (selected: string) => { const item = session && currentInteraction(session); if (!session || !item || "kind" in item || locked.current) return; locked.current = true; const result = await answerQuestion(repository, session.id, item, selected, Math.round(performance.now() - startAt.current)); const updated = await getSession(repository, session.id); if (result === "try-again") { setMessage("Try again."); play(audioFor(item.targetConceptId)?.src); } else if (result === "delayed-retry") setMessage("Let’s practise it again later."); else if (result === "correct") setMessage("Great!"); else navigate(`/finish?session=${session.id}`, { replace: true }); setSession(updated); startAt.current = performance.now(); window.setTimeout(() => { setMessage(undefined); locked.current = false; }, result === "try-again" ? 250 : 300); };
+  const answer = async (selected: string) => { const item = session && currentInteraction(session); const answerState = session && item && !("kind" in item) ? session.questionStates?.[item.id] : undefined; if (!session || !item || "kind" in item || locked.current || (answerState && answerState.result !== "open")) return; locked.current = true; const result = await answerQuestion(repository, session.id, item, selected, Math.round(performance.now() - startAt.current)); const updated = await getSession(repository, session.id); if (result === "try-again") { setMessage("Not quite. Try again."); } else if (result === "revealed") setMessage("Here is the right answer. Look carefully, then continue."); else if (result === "correct") setMessage("Great job! Tap Continue when you are ready."); else navigate(`/finish?session=${session.id}`, { replace: true }); setSession(updated); window.setTimeout(() => { setMessage(undefined); locked.current = false; }, 150); };
+  const continueAfterFeedback = async () => { if (!session || locked.current) return; locked.current = true; const result = await continueQuestion(repository, session.id); const updated = await getSession(repository, session.id); if (result === "finished") navigate(`/finish?session=${session.id}`, { replace: true }); else { setSession(updated); setMessage(undefined); startAt.current = performance.now(); } window.setTimeout(() => { locked.current = false; }, 200); };
   if (!session) return <main className="child-shell"><p>Getting your adventure ready…</p></main>; const item = currentInteraction(session); if (!item) return <main className="child-shell"><p>Finishing your adventure…</p></main>;
   const completed = (session.interactions ?? []).slice(0, session.currentInteractionIndex ?? 0).filter((entry) => !("kind" in entry)).length;
-  return <main className="child-shell study-page"><header className="study-header"><button type="button" className="back-button" aria-label="Back home" onClick={() => navigate("/")}>←</button><div className="progress-track" aria-label="Adventure progress"><i style={{ width: `${Math.max(4, (completed / Math.max(1, session.interactionCount - session.newConceptIds.length)) * 100)}%` }} /></div><span>⭐ {session.stars ?? 0}</span></header>{message && <p className="feedback">{message}</p>}{"kind" in item ? <LearnView conceptId={item.conceptId} sessionId={session.id} onNext={() => void advanceLearn()} /> : <QuestionView question={item} onAnswer={(id) => void answer(id)} />}</main>;
+  return <main className="child-shell study-page"><header className="study-header"><button type="button" className="back-button" aria-label="Back home" onClick={() => navigate("/")}>←</button><div className="progress-track" aria-label="Adventure progress"><i style={{ width: `${Math.max(4, (completed / Math.max(1, session.interactionCount - session.newConceptIds.length)) * 100)}%` }} /></div><span>⭐ {session.stars ?? 0}</span></header>{message && <p className="feedback">{message}</p>}{"kind" in item ? <LearnView conceptId={item.conceptId} sessionId={session.id} onNext={() => void advanceLearn()} /> : <QuestionView question={item} state={session.questionStates?.[item.id]} onAnswer={(id) => void answer(id)} onContinue={() => void continueAfterFeedback()} />}</main>;
 }
 
 export function FinishPage() {

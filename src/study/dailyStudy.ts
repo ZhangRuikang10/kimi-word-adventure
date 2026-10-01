@@ -6,10 +6,10 @@ import { scheduleNextReview } from "../engine/spacedReview";
 import { canAppendQuestion, chooseBalancedAnswerIndex } from "../engine/antiPattern";
 import { availableTypes, createQuestion } from "../engine/questionFactory";
 import { SeededRandom } from "../engine/random";
-import type { AttemptEvent, ConceptProgress, Question, SessionInteraction, SessionKind, SessionRecord } from "../types/learning";
+import type { AttemptEvent, ConceptProgress, Question, QuestionAnswerState, SessionInteraction, SessionKind, SessionRecord } from "../types/learning";
 import type { ProgressRepository } from "../storage/progressRepository";
 
-export type AnswerResult = "correct" | "try-again" | "delayed-retry" | "finished";
+export type AnswerResult = "correct" | "try-again" | "revealed" | "finished";
 
 const dayKey = (date: Date) => date.toISOString().slice(0, 10);
 const questionCountBefore = (interactions: SessionInteraction[], endExclusive: number) => interactions.slice(0, endExclusive).filter((item) => !("kind" in item)).length;
@@ -46,6 +46,7 @@ export async function startOrResumeToday(repository: ProgressRepository, now = n
     interactions: plan.interactions,
     currentInteractionIndex: 0,
     answerRetries: {},
+    questionStates: {},
     pendingRetries: [],
     mistakeConceptIds: [],
     stars: 0,
@@ -70,7 +71,7 @@ export async function startPracticeSession(repository: ProgressRepository, kind:
     ? Object.fromEntries(selected.map((id) => [id, "weak-word-review"] as const))
     : {};
   const plan = buildSessionPlan({ newConceptIds: [], reviewConceptIds: selected, targetSources }, progress, seed);
-  const session: SessionRecord = { id: `${kind}-${now.getTime()}-${seed.slice(-6)}`, kind, startedAt: now.toISOString(), targetConceptIds: selected, newConceptIds: [], reviewConceptIds: selected, targetSources, interactionCount: plan.interactions.length, correctCount: 0, retryCount: 0, seed, interactions: plan.interactions, currentInteractionIndex: 0, answerRetries: {}, pendingRetries: [], mistakeConceptIds: [], stars: 0 };
+  const session: SessionRecord = { id: `${kind}-${now.getTime()}-${seed.slice(-6)}`, kind, startedAt: now.toISOString(), targetConceptIds: selected, newConceptIds: [], reviewConceptIds: selected, targetSources, interactionCount: plan.interactions.length, correctCount: 0, retryCount: 0, seed, interactions: plan.interactions, currentInteractionIndex: 0, answerRetries: {}, questionStates: {}, pendingRetries: [], mistakeConceptIds: [], stars: 0 };
   await repository.saveSession(session);
   return session;
 }
@@ -147,7 +148,7 @@ async function moveForward(repository: ProgressRepository, session: SessionRecor
   return "finished";
 }
 
-/** Record every tap. A first miss stays on the same question; a second miss schedules a delayed retry. */
+/** Record every tap. Results always wait for the child's explicit Continue action. */
 export async function answerQuestion(repository: ProgressRepository, sessionId: string, question: Question, selectedAnswer: string, responseMs: number, now = new Date()): Promise<AnswerResult> {
   const session = await sessionById(repository, sessionId);
   if (!session || session.completedAt) return "finished";
@@ -174,11 +175,19 @@ export async function answerQuestion(repository: ProgressRepository, sessionId: 
   };
   await repository.addAttempt(event);
   session.answerRetries = { ...(session.answerRetries ?? {}), [question.id]: tapCount };
+  const previousState = session.questionStates?.[question.id];
+  const wrongOptionIds = [...new Set([...(previousState?.wrongOptionIds ?? []), ...(correct ? [] : [selectedAnswer])])];
   if (correct) {
     session.correctCount += 1;
     session.stars = (session.stars ?? 0) + 1;
+    session.questionStates = { ...(session.questionStates ?? {}), [question.id]: { wrongOptionIds, result: "correct" } satisfies QuestionAnswerState };
     await repository.saveSession(session);
-    return moveForward(repository, session, now);
+    return "correct";
+  }
+  if (tapCount === 1) {
+    session.questionStates = { ...(session.questionStates ?? {}), [question.id]: { wrongOptionIds, result: "open" } satisfies QuestionAnswerState };
+    await repository.saveSession(session);
+    return "try-again";
   }
   if (!question.isRetry && !(session.mistakeConceptIds ?? []).includes(question.targetConceptId)) {
     const completed = completedQuestions(session);
@@ -189,13 +198,19 @@ export async function answerQuestion(repository: ProgressRepository, sessionId: 
       { conceptId: question.targetConceptId, dueAfterQuestionCount: completed + 13, reinforcementNumber: 2 },
     ];
   }
-  if (tapCount === 1) {
-    await repository.saveSession(session);
-    return "try-again";
-  }
+  session.questionStates = { ...(session.questionStates ?? {}), [question.id]: { wrongOptionIds, result: "revealed" } satisfies QuestionAnswerState };
   await repository.saveSession(session);
-  const result = await moveForward(repository, session, now);
-  return result === "finished" ? "finished" : "delayed-retry";
+  return "revealed";
+}
+
+/** Advance only after the child has seen the answer feedback and chooses to continue. */
+export async function continueQuestion(repository: ProgressRepository, sessionId: string, now = new Date()): Promise<AnswerResult> {
+  const session = await sessionById(repository, sessionId);
+  const item = session && currentInteraction(session);
+  if (!session || session.completedAt || !item || "kind" in item) return "finished";
+  const state = session.questionStates?.[item.id];
+  if (!state || state.result === "open") return "try-again";
+  return moveForward(repository, session, now);
 }
 
 /** Completion is idempotent, so refreshes and double taps cannot add rewards twice. */

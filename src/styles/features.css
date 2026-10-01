@@ -22,3 +22,18 @@
 .empty-mistakes { margin-top:24px; padding:36px 18px; border-radius:24px; background:#fff; text-align:center; }
 .empty-mistakes span { font-size:2.5rem; }
 @media (max-width:360px) { .child-nav { grid-template-columns:1fr; } .mistake-grid { grid-template-columns:1fr; } }
+
+/* Answer feedback is persistent until the child explicitly continues. */
+.question-prompt { margin-bottom:16px; color:#385a79; font-size:clamp(1.15rem,5vw,1.6rem); font-weight:1000; letter-spacing:.01em; }
+.target-word { padding:10px 16px; border-radius:18px; color:#102b4a; background:#eefaff; box-shadow:inset 0 0 0 3px #c8edf5; font-size:clamp(2.75rem,13vw,5.25rem); }
+.bridge-text { color:#263f5a; font-size:clamp(1.3rem,6vw,2rem); font-weight:1000; }
+.answer-grid { gap:12px; margin-top:18px; }
+.image-answer,.word-answer { border-width:4px; transition:transform .15s ease,border-color .15s ease,background .15s ease; }
+.image-answer { min-height:145px; padding:5px; }
+.word-answer { min-height:82px; padding:12px; border-radius:22px; font-size:clamp(1.3rem,6vw,2rem); }
+.image-answer:not(:disabled):active,.word-answer:not(:disabled):active { transform:scale(.97); }
+.image-answer:disabled,.word-answer:disabled { cursor:default; opacity:1; }
+.answer-correct { border-color:#38a875 !important; background:#e3f8eb !important; box-shadow:0 0 0 5px #b7ebcb; }
+.answer-wrong { border-color:#df5b57 !important; background:#fff0ef !important; box-shadow:0 0 0 5px #ffd1cf; }
+.continue-button { margin-top:24px; }
+@media (max-width:360px) { .word-answer { min-height:64px; font-size:1.2rem; } .image-answer { min-height:115px; } }

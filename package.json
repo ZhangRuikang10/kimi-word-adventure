@@ -14,6 +14,7 @@
     "audit:audio": "tsx scripts/audit-audio.ts",
     "audit:assets": "tsx scripts/audit-assets.ts",
     "produce:audio": "tsx scripts/produce-formal-audio.mjs",
+    "produce:question-prompts": "node scripts/produce-ui-prompts.mjs",
     "sync:course-assets": "node scripts/sync-course-assets.mjs"
   },
   "dependencies": {

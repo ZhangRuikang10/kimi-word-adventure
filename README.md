@@ -21,3 +21,9 @@ pnpm sync:course-assets
 Push the `main` branch to a GitHub repository named `kimi-word-adventure`, then
 select **GitHub Actions** as the Pages source in the repository settings. The
 included workflow tests, builds, and deploys the application automatically.
+
+## Learning data
+
+GitHub Pages is a static website. In this release, learning records stay in the
+browser used for practice. The Teacher page on that same browser can show that
+browser's progress.

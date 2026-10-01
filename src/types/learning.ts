@@ -44,7 +44,13 @@ export interface SessionRecord {
   interactionCount: number; correctCount: number; retryCount: number; seed: string;
   /** Persisted interaction state lets an in-progress daily adventure resume after refresh. */
   interactions?: SessionInteraction[]; currentInteractionIndex?: number; answerRetries?: Record<string, number>; pendingRetries?: PendingRetry[]; mistakeConceptIds?: string[]; stars?: number;
+  /** Saved answer feedback prevents a refresh from skipping or hiding a result. */
+  questionStates?: Record<string, QuestionAnswerState>;
 }
+export type QuestionAnswerState = {
+  wrongOptionIds: string[];
+  result: "open" | "correct" | "revealed";
+};
 export interface AnalyticsEvent { id: string; type: "session_completed" | "teacher_control" | "backup_imported"; createdAt: string; payload: Record<string, unknown>; }
 export interface Question { id: string; targetConceptId: string; type: QuestionType; category: string; options: string[]; correctOptionIndex: number; visualAssetId?: string; optionVisualAssetIds?: Record<string, string>; isRetry?: boolean; }
 export interface LearnCard { kind: "learn"; conceptId: string; }
